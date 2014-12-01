@@ -7,6 +7,8 @@ set -e
     mknod /dev/net/tun c 10 200
 
 cd /etc/openvpn
+[ -f static.key ] ||
+    openvpn --genkey --secret static.key
 [ -f dh.pem ] ||
     openssl dhparam -out dh.pem 512
 [ -f key.pem ] ||
@@ -17,35 +19,14 @@ chmod 600 key.pem
 [ -f cert.pem ] ||
     openssl x509 -req -in csr.pem -out cert.pem -signkey key.pem -days 36525
 
-[ -f tcp443.conf ] || cat >tcp443.conf <<EOF
-server 192.168.255.0 255.255.255.128
-verb 3
-duplicate-cn
-key key.pem
-ca cert.pem
-cert cert.pem
-dh dh.pem
-keepalive 10 60
-persist-key
-persist-tun
-push "dhcp-option DNS 8.8.8.8"
-push "dhcp-option DNS 8.8.4.4"
-
-proto tcp-server
-port 443
-dev tun443
-status openvpn-status-443.log
-EOF
-
 [ -f udp1194.conf ] || cat >udp1194.conf <<EOF
-server 192.168.255.128 255.255.255.128
+ifconfig 192.168.200.1 192.168.200.2
+
 verb 3
-duplicate-cn
-key key.pem
-ca cert.pem
-cert cert.pem
-dh dh.pem
-keepalive 10 60
+comp-lzo
+secret static.key
+keepalive 1 10
+ping-timer-rem
 persist-key
 persist-tun
 push "dhcp-option DNS 8.8.8.8"
@@ -65,44 +46,41 @@ MY_IP_ADDR=$(curl -s http://myip.enix.org/REMOTE_ADDR)
 }
 
 [ -f client.ovpn ] || cat >client.ovpn <<EOF
-client
-nobind
+remote $MY_IP_ADDR
+ifconfig 192.168.200.2 192.168.200.1
+
+proto udp
+port 1194
 dev tun
+nobind
+
+comp-lzo
+keepalive 1 10
+ping-timer-rem
+persist-tun
+persist-key
 redirect-gateway def1
 
-<key>
-`cat key.pem`
-</key>
-<cert>
-`cat cert.pem`
-</cert>
-<ca>
-`cat cert.pem`
-</ca>
-<dh>
-`cat dh.pem`
-</dh>
+# Exclude Intranet
+route 172.16.0.0 255.240.0.0 net_gateway
 
-<connection>
-remote $MY_IP_ADDR 1194 udp
-</connection>
-
-<connection>
-remote $MY_IP_ADDR 443 tcp-client
-</connection>
+secret [inline]
+<secret>
+`cat static.key`
+</secret>
 EOF
 
 [ -f client.http ] || cat >client.http <<EOF
 HTTP/1.0 200 OK
 Content-Type: application/x-openvpn-profile
 Content-Length: `wc -c client.ovpn`
+Content-Disposition: attachment; filename="$MY_IP_ADDR-client.ovpn"
 
 `cat client.ovpn`
 EOF
 
-iptables -t nat -A POSTROUTING -s 192.168.255.0/24 -o eth0 -j MASQUERADE
+iptables -t nat -A POSTROUTING -s 192.168.200.0/24 -o eth0 -j MASQUERADE
 
-touch tcp443.log udp1194.log http8080.log
-while true ; do openvpn tcp443.conf ; done >> tcp443.log &
+touch udp1194.log http8080.log
 while true ; do openvpn udp1194.conf ; done >> udp1194.log &
 tail -F *.log
