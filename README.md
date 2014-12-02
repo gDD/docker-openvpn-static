@@ -3,9 +3,13 @@
 Quick instructions:
 
 ```bash
-CID=$(docker run -d --privileged -p 1194:1194/udp -p 443:443/tcp jpetazzo/openvpn)
-docker run -t -i -p 8080:8080 --volumes-from $CID jpetazzo/openvpn serveconfig
+CID=$(docker run -d --privileged -p 1194:1194/udp gaomd/openvpn-static)
+docker run -t -i -p 8080:8080 --volumes-from $CID gaomd/openvpn-static serveconfig
 ```
+
+---
+
+**Anything following is out-dated for this fork.**
 
 Now download the file located at the indicated URL. You will get a
 certificate warning, since the connection is done over SSL, but we are
