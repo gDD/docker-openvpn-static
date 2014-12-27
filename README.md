@@ -3,8 +3,8 @@
 Quick instructions:
 
 ```bash
-CID=$(docker run -d --privileged -p 1194:1194/udp gaomd/docker-openvpn-static)
-docker run -t -i -p 8080:8080 --volumes-from $CID gaomd/docker-openvpn-static serveconfig
+CID=$(docker run -d --privileged -p 1194:1194/udp gaomd/openvpn-static)
+docker run -t -i -p 8080:8080 --volumes-from $CID gaomd/openvpn-static serveconfig
 ```
 
 ---
